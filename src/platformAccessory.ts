@@ -37,7 +37,7 @@ export class LgNetcastTV {
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'LG')
-      .setCharacteristic(this.platform.Characteristic.Model, '55LA6600')
+      .setCharacteristic(this.platform.Characteristic.Model, this.netcastAccessory.model)
       .setCharacteristic(this.platform.Characteristic.SerialNumber, this.netcastAccessory.host);
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
@@ -56,7 +56,14 @@ export class LgNetcastTV {
       .on('set', this.setOn.bind(this)) // SET - bind to the `setOn` method below
       .on('get', this.getOn.bind(this)); // GET - bind to the `getOn` method below
 
-    this.service.setCharacteristic(this.platform.Characteristic.ActiveIdentifier, 1);
+    this.service
+      .setCharacteristic(this.platform.Characteristic.ActiveIdentifier, 1)
+      .setCharacteristic(this.platform.Characteristic.ConfiguredName, this.netcastAccessory.name)
+      .setCharacteristic(this.platform.Characteristic.Name, this.netcastAccessory.name)
+      .setCharacteristic(
+        this.platform.Characteristic.SleepDiscoveryMode,
+        this.platform.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
+      );
 
     // handle input source changes
     this.service
@@ -92,11 +99,6 @@ export class LgNetcastTV {
         this.channelUpdateInProgress = false;
         callback(null);
       });
-
-    this.service.setCharacteristic(
-      this.platform.Characteristic.SleepDiscoveryMode,
-      this.platform.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
-    );
 
     this.service.getCharacteristic(this.platform.Characteristic.RemoteKey).on('set', async (newValue, callback) => {
       switch (newValue) {
