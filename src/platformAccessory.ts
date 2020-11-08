@@ -316,13 +316,21 @@ export class LgNetcastTV {
         this.platform.log.debug(`Potentially identified active channel as '${chan.name}'`);
         if (currentActiveIdentifier !== i) {
           this.service.setCharacteristic(this.platform.Characteristic.ActiveIdentifier, i);
-          this.hideWildcardChannel();
         }
+        this.hideWildcardChannel();
         return;
       }
     }
 
-    this.updateWildcardChannel(this.currentChannel.chname || 'UNKNOWN');
+    let chanName = this.currentChannel.chname || '';
+    if (typeof chanName === 'object') {
+      chanName = this.currentChannel.labelName || '';
+    }
+    if (typeof chanName === 'object') {
+      chanName = this.currentChannel.inputSourceName || '';
+    }
+
+    this.updateWildcardChannel(chanName);
   }
 
   updateWildcardChannel(name: string) {
@@ -360,12 +368,19 @@ export class LgNetcastTV {
   }
 
   hideWildcardChannel() {
-    this.platform.log.debug('Hiding temporary channel');
     const existingChanService = this.findInputService(this.unknownChannelName);
     if (existingChanService === null) {
       return;
     }
 
+    if (
+      existingChanService.getCharacteristic(this.platform.Characteristic.CurrentVisibilityState).value ===
+      this.platform.Characteristic.CurrentVisibilityState.HIDDEN
+    ) {
+      return;
+    }
+
+    this.platform.log.debug('Hiding temporary channel');
     existingChanService.setCharacteristic(
       this.platform.Characteristic.CurrentVisibilityState,
       this.platform.Characteristic.CurrentVisibilityState.HIDDEN,
