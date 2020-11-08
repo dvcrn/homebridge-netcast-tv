@@ -24,7 +24,7 @@ export class LgNetcastTV {
   private unknownChannelIdentifier: number;
   private unknownChannelName: string;
 
-  private offTimeout: any;
+  private offTimeout: NodeJS.Timeout | null;
   private offPause: boolean;
 
   constructor(private readonly platform: LgNetcastPlatform, private readonly accessory: PlatformAccessory) {
