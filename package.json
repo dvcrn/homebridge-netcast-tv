@@ -1,5 +1,4 @@
 {
-  "private": true,
   "displayName": "Homebridge LG Netcast",
   "name": "homebridge-lg-netcast",
   "version": "1.0.0",
