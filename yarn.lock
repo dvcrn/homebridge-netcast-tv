@@ -1118,10 +1118,10 @@ levn@^0.4.1:
     prelude-ls "^1.2.1"
     type-check "~0.4.0"
 
-lg-netcast@1.1.0:
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/lg-netcast/-/lg-netcast-1.1.0.tgz#6fe22ab4755fbd72fc01068455af999e6e8167a2"
-  integrity sha512-Zk1ynRNsKGPGuVdVkaMn2jJjfDs4Kyon1J236s4d6pCqaGm0BFY208x9tBZlehsxie+sOY5ZZFueWUFvRF5NVA==
+lg-netcast@1.1.2:
+  version "1.1.2"
+  resolved "https://registry.yarnpkg.com/lg-netcast/-/lg-netcast-1.1.2.tgz#197b30f707506cf6422b1dd3bea7d7236402d4d2"
+  integrity sha512-2XMkjG5MRjk6D82J9fTQ3NNBk+yzdc4pP8aQclvqZeBODvmdOP4e4/WWmjGkqbxg5mmo+69roRTtT6GQnXzyVg==
   dependencies:
     "@types/node" "^14.14.6"
     flags "^0.1.3"
