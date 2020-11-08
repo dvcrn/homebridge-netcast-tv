@@ -46,8 +46,6 @@ export class LgNetcastTV {
       .setCharacteristic(this.platform.Characteristic.Model, this.netcastAccessory.model)
       .setCharacteristic(this.platform.Characteristic.SerialNumber, this.netcastAccessory.host);
 
-    // get the LightBulb service if it exists, otherwise create a new LightBulb service
-    // you can create multiple services for each accessory
     this.service =
       this.accessory.getService(this.platform.Service.Television) ||
       this.accessory.addService(this.platform.Service.Television);
