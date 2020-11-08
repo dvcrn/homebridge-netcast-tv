@@ -1,28 +1,92 @@
 {
   "pluginAlias": "lg-netcast",
   "pluginType": "platform",
-  "singular": false,
+  "singular": true,
   "schema": {
     "type": "object",
     "properties": {
-      "name": {
-        "title": "Name",
-        "type": "string",
-        "required": true,
-        "default": "LG Netcast TV"
-      },
-      "host": {
-        "title": "TV Host + Port",
-        "type": "string",
-        "required": true,
-        "default": "192.168.1.1:8080"
-      },
       "accessories": {
         "title": "TV accessories",
         "type": "array",
-        "required": true,
-        "default": {},
-      },
+        "default": [],
+        "items": {
+          "host": {
+            "title": "Host + Port",
+            "type": "string",
+            "required": true,
+            "default": "192.168.1.1:8080",
+            "description": "Default port is :8080. Make sure you don't forget specifying that. "
+          },
+          "mac": {
+            "title": "Mac Address",
+            "type": "string",
+            "required": true,
+            "default": "ff:ff:ff:ff:ff:ff"
+          },
+          "accessToken": {
+            "title": "Access Token / Pair Key",
+            "description": "",
+            "type": "string",
+            "required": true
+          },
+          "keyInputDelay": {
+            "title": "Key Input Delay (ms)",
+            "type": "number",
+            "required": false,
+            "default": 600,
+            "description": "Time to wait in between key presses for actions such as switching input sources"
+          },
+          "offPauseDuration": {
+            "title": "Off Pause Duration (ms)",
+            "type": "number",
+            "required": false,
+            "default": 600000,
+            "description": "Time to wait after the TV has been turned off before starting to query for the status again. This is needed because the TV still responds to channel API requests when it's 'off', until it deactivates it's network card."
+          },
+          "name": {
+            "title": "Name",
+            "type": "string",
+            "required": true,
+            "default": "LG Netcast TV"
+          },
+          "channels": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["hdmi", "tuner"]
+              },
+              "channel": {
+                "type": "object",
+                "properties": {
+                  "inputSourceType": {
+                    "type": "string"
+                  },
+                  "inputSourceIdx": {
+                    "type": "string"
+                  },
+                  "major": {
+                    "type": "string"
+                  },
+                  "minor": {
+                    "type": "string"
+                  },
+                  "sourceIndex": {
+                    "type": "string"
+                  },
+                  "physicalNum": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
