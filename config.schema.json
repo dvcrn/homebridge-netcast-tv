@@ -1,7 +1,7 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "lg-netcast",
   "pluginType": "platform",
-  "singular": true,
+  "singular": false,
   "schema": {
     "type": "object",
     "properties": {
@@ -9,8 +9,20 @@
         "title": "Name",
         "type": "string",
         "required": true,
-        "default": "Example Dynamic Platform"
-      }
+        "default": "LG Netcast TV"
+      },
+      "host": {
+        "title": "TV Host + Port",
+        "type": "string",
+        "required": true,
+        "default": "192.168.1.1:8080"
+      },
+      "accessories": {
+        "title": "TV accessories",
+        "type": "array",
+        "required": true,
+        "default": {},
+      },
     }
   }
 }

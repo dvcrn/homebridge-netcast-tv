@@ -1,151 +1,369 @@
-import { Service, PlatformAccessory, CharacteristicValue, CharacteristicSetCallback, CharacteristicGetCallback } from 'homebridge';
+import {
+  Service,
+  PlatformAccessory,
+  CharacteristicValue,
+  CharacteristicSetCallback,
+  CharacteristicGetCallback,
+} from 'homebridge';
+import { LgNetcastPlatform, NetcastAccessory, ChannelConfig } from './platform';
+import wakeonlan from 'wake_on_lan';
 
-import { ExampleHomebridgePlatform } from './platform';
+import { Channel, NetcastClient, LG_COMMAND, LG_HANDLE, LG_QUERY } from 'lg-netcast';
 
 /**
  * Platform Accessory
  * An instance of this class is created for each accessory your platform registers
  * Each accessory may expose multiple services of different service types.
  */
-export class ExamplePlatformAccessory {
+export class LgNetcastTV {
   private service: Service;
+  private netcastClient: NetcastClient;
+  private netcastAccessory: NetcastAccessory;
+  private currentChannel: Channel | null;
+  private channelUpdateInProgress: boolean;
 
-  /**
-   * These are just used to create a working example
-   * You should implement your own code to track the state of your accessory
-   */
-  private exampleStates = {
-    On: false,
-    Brightness: 100,
-  };
-
-  constructor(
-    private readonly platform: ExampleHomebridgePlatform,
-    private readonly accessory: PlatformAccessory,
-  ) {
+  constructor(private readonly platform: LgNetcastPlatform, private readonly accessory: PlatformAccessory) {
+    this.currentChannel = null;
+    this.netcastAccessory = accessory.context.device;
+    this.netcastClient = new NetcastClient(this.netcastAccessory.host);
+    this.channelUpdateInProgress = false;
 
     // set accessory information
-    this.accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+    this.accessory
+      .getService(this.platform.Service.AccessoryInformation)!
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'LG')
+      .setCharacteristic(this.platform.Characteristic.Model, '55LA6600')
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.netcastAccessory.host);
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
     // you can create multiple services for each accessory
-    this.service = this.accessory.getService(this.platform.Service.Lightbulb) || this.accessory.addService(this.platform.Service.Lightbulb);
+    this.service =
+      this.accessory.getService(this.platform.Service.Television) ||
+      this.accessory.addService(this.platform.Service.Television);
 
     // set the service name, this is what is displayed as the default name on the Home app
     // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.exampleDisplayName);
-
-    // each service must implement at-minimum the "required characteristics" for the given service type
-    // see https://developers.homebridge.io/#/service/Lightbulb
+    this.service.setCharacteristic(this.platform.Characteristic.Active, this.platform.Characteristic.Active.ACTIVE);
 
     // register handlers for the On/Off Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.On)
-      .on('set', this.setOn.bind(this))                // SET - bind to the `setOn` method below
-      .on('get', this.getOn.bind(this));               // GET - bind to the `getOn` method below
+    this.service
+      .getCharacteristic(this.platform.Characteristic.Active)
+      .on('set', this.setOn.bind(this)) // SET - bind to the `setOn` method below
+      .on('get', this.getOn.bind(this)); // GET - bind to the `getOn` method below
 
-    // register handlers for the Brightness Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-      .on('set', this.setBrightness.bind(this));       // SET - bind to the 'setBrightness` method below
+    this.service.setCharacteristic(this.platform.Characteristic.ActiveIdentifier, 1);
 
+    // handle input source changes
+    this.service
+      .getCharacteristic(this.platform.Characteristic.ActiveIdentifier)
+      .on('set', async (newValue, callback) => {
+        // the value will be the value you set for the Identifier Characteristic
+        // on the Input Source service that was selected - see input sources below.
+        this.platform.log.info('set Active Identifier => setNewValue: ' + newValue);
 
-    /**
-     * Creating multiple services of the same type.
-     * 
-     * To avoid "Cannot add a Service with the same UUID another Service without also defining a unique 'subtype' property." error,
-     * when creating multiple services of the same type, you need to use the following syntax to specify a name and subtype id:
-     * this.accessory.getService('NAME') || this.accessory.addService(this.platform.Service.Lightbulb, 'NAME', 'USER_DEFINED_SUBTYPE_ID');
-     * 
-     * The USER_DEFINED_SUBTYPE must be unique to the platform accessory (if you platform exposes multiple accessories, each accessory
-     * can use the same sub type id.)
-     */
+        const newChannel = this.netcastAccessory.channels[newValue];
+        const currentChannel = this.currentChannel;
 
-    // Example: add two "motion sensor" services to the accessory
-    const motionSensorOneService = this.accessory.getService('Motion Sensor One Name') ||
-      this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor One Name', 'YourUniqueIdentifier-1');
+        this.channelUpdateInProgress = true;
+        if (newChannel.channel.inputSourceIdx !== undefined) {
+          // if different inputsourceidx, we have to manually switch to the channel
+          if (newChannel.channel.inputSourceIdx !== currentChannel?.inputSourceIdx) {
+            await this.switchToSourceIdx(parseInt(newChannel.channel.inputSourceIdx));
+            await this.wait(3000);
+          }
+        }
 
-    const motionSensorTwoService = this.accessory.getService('Motion Sensor Two Name') ||
-      this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor Two Name', 'YourUniqueIdentifier-2');
+        if (newChannel.type === 'tuner') {
+          const sessionId = await this.netcastClient.get_session(this.netcastAccessory.accessToken);
+          await this.netcastClient.change_channel(newChannel.channel, sessionId);
+        }
 
-    /**
-     * Updating characteristics values asynchronously.
-     * 
-     * Example showing how to update the state of a Characteristic asynchronously instead
-     * of using the `on('get')` handlers.
-     * Here we change update the motion sensor trigger states on and off every 10 seconds
-     * the `updateCharacteristic` method.
-     * 
-     */
-    let motionDetected = false;
+        this.channelUpdateInProgress = false;
+        callback(null);
+      });
+
+    this.service.setCharacteristic(
+      this.platform.Characteristic.SleepDiscoveryMode,
+      this.platform.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
+    );
+
+    this.service.getCharacteristic(this.platform.Characteristic.RemoteKey).on('set', async (newValue, callback) => {
+      switch (newValue) {
+        case this.platform.Characteristic.RemoteKey.REWIND: {
+          await this.sendAuthorizedCommand(LG_COMMAND.REWIND);
+          break;
+        }
+        case this.platform.Characteristic.RemoteKey.FAST_FORWARD: {
+          await this.sendAuthorizedCommand(LG_COMMAND.FAST_FORWARD);
+          break;
+        }
+        case this.platform.Characteristic.RemoteKey.NEXT_TRACK: {
+          await this.sendAuthorizedCommand(LG_COMMAND.SKIP_FORWARD);
+          break;
+        }
+        case this.platform.Characteristic.RemoteKey.PREVIOUS_TRACK: {
+          await this.sendAuthorizedCommand(LG_COMMAND.SKIP_BACKWARD);
+          break;
+        }
+        case this.platform.Characteristic.RemoteKey.ARROW_UP: {
+          await this.sendAuthorizedCommand(LG_COMMAND.UP);
+          break;
+        }
+        case this.platform.Characteristic.RemoteKey.ARROW_DOWN: {
+          await this.sendAuthorizedCommand(LG_COMMAND.DOWN);
+          break;
+        }
+        case this.platform.Characteristic.RemoteKey.ARROW_LEFT: {
+          await this.sendAuthorizedCommand(LG_COMMAND.LEFT);
+          break;
+        }
+        case this.platform.Characteristic.RemoteKey.ARROW_RIGHT: {
+          await this.sendAuthorizedCommand(LG_COMMAND.RIGHT);
+          break;
+        }
+        case this.platform.Characteristic.RemoteKey.SELECT: {
+          await this.sendAuthorizedCommand(LG_COMMAND.OK);
+          break;
+        }
+        case this.platform.Characteristic.RemoteKey.BACK: {
+          await this.sendAuthorizedCommand(LG_COMMAND.BACK);
+          break;
+        }
+        case this.platform.Characteristic.RemoteKey.EXIT: {
+          await this.sendAuthorizedCommand(LG_COMMAND.EXIT);
+          break;
+        }
+        case this.platform.Characteristic.RemoteKey.PLAY_PAUSE: {
+          await this.sendAuthorizedCommand(LG_COMMAND.PLAY);
+          break;
+        }
+        case this.platform.Characteristic.RemoteKey.INFORMATION: {
+          await this.sendAuthorizedCommand(LG_COMMAND.PROGRAM_INFORMATION);
+          break;
+        }
+      }
+
+      // don't forget to callback!
+      callback(null);
+    });
+
+    const speakerService =
+      this.accessory.getService(this.platform.Service.TelevisionSpeaker) ||
+      this.accessory.addService(this.platform.Service.TelevisionSpeaker);
+
+    speakerService
+      .setCharacteristic(this.platform.Characteristic.Active, this.platform.Characteristic.Active.ACTIVE)
+      .setCharacteristic(
+        this.platform.Characteristic.VolumeControlType,
+        this.platform.Characteristic.VolumeControlType.RELATIVE,
+      );
+
+    // handle volume control
+    speakerService
+      .getCharacteristic(this.platform.Characteristic.VolumeSelector)
+      .on('set', async (newValue, callback) => {
+        if (newValue === 0) {
+          await this.sendAuthorizedCommand(LG_COMMAND.VOLUME_UP);
+        } else {
+          await this.sendAuthorizedCommand(LG_COMMAND.VOLUME_DOWN);
+        }
+        callback(null);
+      });
+
+    for (const [i, chan] of this.netcastAccessory.channels.entries()) {
+      let existingChanService = this.findInputService(chan.name);
+      if (existingChanService === null) {
+        this.platform.log.info('Creating new input service: ', chan.name);
+        existingChanService = this.accessory.addService(this.platform.Service.InputSource, chan.name, chan.name);
+      }
+
+      // set characteristics
+      existingChanService
+        .setCharacteristic(this.platform.Characteristic.ConfiguredName, chan.name)
+        .setCharacteristic(this.platform.Characteristic.Identifier, i)
+        .setCharacteristic(
+          this.platform.Characteristic.InputSourceType,
+          this.platform.Characteristic.InputSourceType.HDMI,
+        )
+        .setCharacteristic(
+          this.platform.Characteristic.IsConfigured,
+          this.platform.Characteristic.IsConfigured.CONFIGURED,
+        );
+
+      this.service.addLinkedService(existingChanService);
+    }
+
+    this.removeUnusedInputServices(this.netcastAccessory.channels);
+
+    // interval for updating the current active identifier
+    this.updateCurrentChannel();
     setInterval(() => {
-      // EXAMPLE - inverse the trigger
-      motionDetected = !motionDetected;
+      this.updateCurrentChannel();
+    }, 5000);
+  }
 
-      // push the new value to HomeKit
-      motionSensorOneService.updateCharacteristic(this.platform.Characteristic.MotionDetected, motionDetected);
-      motionSensorTwoService.updateCharacteristic(this.platform.Characteristic.MotionDetected, !motionDetected);
+  wait(ms: number) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+  }
 
-      this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
-      this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-    }, 10000);
+  async sendAuthorizedCommand(cmd: LG_COMMAND) {
+    this.platform.log.debug('Sending command to TV: ', cmd, LG_COMMAND[cmd]);
+    const sessionId = await this.netcastClient.get_session(this.netcastAccessory.accessToken);
+    return this.netcastClient.send_command(cmd, sessionId);
   }
 
   /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
+   * Switches the TV to the given inputsource idx This will literally open the
+   * input source selector and click LEFT/RIGHT enough times to reach the target
+   * channel. This is a VERY hacky way of doing this, but the netcast API
+   * doesn't allow any other way You can't switch from HDMI to a channel and you
+   * can't switch from a channel back to HDMI
+   *
+   * Instead of this way, it would be much better to use Simplink and HDMI
+   * through an AppleTV or Chromecast
+   *
+   * @param      {number}  idx     The index to switch to
    */
-  setOn(value: CharacteristicValue, callback: CharacteristicSetCallback) {
+  async switchToSourceIdx(idx: number) {
+    const currentIdxStr = this.currentChannel?.inputSourceIdx;
+    if (currentIdxStr === undefined) {
+      return;
+    }
 
-    // implement your own code to turn your device on/off
-    this.exampleStates.On = value as boolean;
+    const currentIdx = parseInt(currentIdxStr);
 
-    this.platform.log.debug('Set Characteristic On ->', value);
+    // nothing to do here
+    if (currentIdx === idx) {
+      return;
+    }
 
-    // you must call the callback function
-    callback(null);
+    this.platform.log.debug('Request to switch to input source idx: ', idx);
+    this.platform.log.debug('Current source idx: ', currentIdx);
+
+    // Open input source switch menu and wait 2s
+    // 2s because sometimes this menu can be pretty slow to load...
+    this.platform.log.debug('Opening InputSource selection');
+    await this.sendAuthorizedCommand(LG_COMMAND.EXTERNAL_INPUT);
+    await this.wait(2000);
+
+    // Click LEFT/RIGHT enough times for us to reach the target channel
+    // Then click "OK" to select it
+    if (currentIdx > idx) {
+      const diff = currentIdx - idx - 1;
+      for (let i = 1; i <= diff; i++) {
+        await this.sendAuthorizedCommand(LG_COMMAND.LEFT);
+        await this.wait(this.netcastAccessory.keyInputDelay);
+      }
+      await this.sendAuthorizedCommand(LG_COMMAND.OK);
+    }
+
+    if (currentIdx < idx) {
+      const diff = idx - currentIdx - 1;
+      for (let i = 1; i <= diff; i++) {
+        await this.sendAuthorizedCommand(LG_COMMAND.RIGHT);
+        await this.wait(this.netcastAccessory.keyInputDelay);
+      }
+      await this.sendAuthorizedCommand(LG_COMMAND.OK);
+    }
   }
 
   /**
-   * Handle the "GET" requests from HomeKit
-   * These are sent when HomeKit wants to know the current state of the accessory, for example, checking if a Light bulb is on.
-   * 
-   * GET requests should return as fast as possbile. A long delay here will result in
-   * HomeKit being unresponsive and a bad user experience in general.
-   * 
-   * If your device takes time to respond you should update the status of your device
-   * asynchronously instead using the `updateCharacteristic` method instead.
-
-   * @example
-   * this.service.updateCharacteristic(this.platform.Characteristic.On, true)
+   * Updates the current channel state
    */
-  getOn(callback: CharacteristicGetCallback) {
+  async updateCurrentChannel() {
+    try {
+      const sessionId = await this.netcastClient.get_session(this.netcastAccessory.accessToken);
+      this.currentChannel = await this.netcastClient.get_current_channel(sessionId);
+    } catch (e) {
+      this.currentChannel = null;
+    }
 
-    // implement your own code to check if the device is on
-    const isOn = this.exampleStates.On;
+    if (this.currentChannel === null) {
+      return;
+    }
 
-    this.platform.log.debug('Get Characteristic On ->', isOn);
+    // Check if we are currently switching channels. If yes, don't do anything to not interfere
+    if (this.channelUpdateInProgress) {
+      return;
+    }
 
-    // you must call the callback function
-    // the first argument should be null if there were no errors
-    // the second argument should be the value to return
-    callback(null, isOn);
+    // check all existing channels and see if the current channel matches with either of them
+    // if it does, update the active input source to that
+    for (const [i, chan] of this.netcastAccessory.channels.entries()) {
+      if (
+        chan.channel.sourceIndex === this.currentChannel.sourceIndex &&
+        chan.channel.inputSourceIdx === this.currentChannel.inputSourceIdx
+      ) {
+        const currentActiveIdentifier = this.service.getCharacteristic(this.platform.Characteristic.ActiveIdentifier)
+          .value;
+
+        this.platform.log.debug(`Potentially identified active channel as '${chan.name}'`);
+        if (currentActiveIdentifier !== i) {
+          this.service.setCharacteristic(this.platform.Characteristic.ActiveIdentifier, i);
+        }
+        return;
+      }
+    }
+
+    // TODO: if doesn't match, do a more broader check. For example / terrestrial
+    // console.log('Could not identify channel');
+    // this.service.setCharacteristic(this.platform.Characteristic.ActiveIdentifier, 99);
+    // this.service.setCharacteristic(this.platform.Characteristic.ActiveIdentifier.);
+    // this.service.removeCharacteristic(this.platform.Characteristic.ActiveIdentifier);
+    // this.service.removeCharacteristic
   }
 
-  /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, changing the Brightness
-   */
-  setBrightness(value: CharacteristicValue, callback: CharacteristicSetCallback) {
+  findInputService(name: string) {
+    for (const ser of this.accessory.services) {
+      for (const linkedSer of ser.linkedServices) {
+        if (linkedSer.displayName === name) {
+          this.platform.log.info('Found existing input service: ', linkedSer.displayName);
+          return linkedSer;
+        }
+      }
+    }
 
-    // implement your own code to set the brightness
-    this.exampleStates.Brightness = value as number;
-
-    this.platform.log.debug('Set Characteristic Brightness -> ', value);
-
-    // you must call the callback function
-    callback(null);
+    return null;
   }
 
+  async removeUnusedInputServices(channelConfig: ChannelConfig[]) {
+    const channelNameMap = {};
+    for (const c of channelConfig) {
+      channelNameMap[c.name] = null;
+    }
+
+    for (const ser of this.accessory.services) {
+      for (const linkedSer of ser.linkedServices) {
+        if (channelNameMap[linkedSer.displayName] === undefined) {
+          this.platform.log.info('Removed unused input service: ', linkedSer.displayName);
+          this.service.removeLinkedService(linkedSer);
+          this.accessory.removeService(linkedSer);
+        }
+      }
+    }
+  }
+
+  async setOn(value: CharacteristicValue, callback: CharacteristicSetCallback) {
+    if (value) {
+      this.platform.log.debug('TV state changed to on, however I cant turn it on. Just updating state isntead');
+      this.platform.log.debug('Use automations to turn the TV on, such as pinging an AppleTV.');
+      callback(null, true);
+      return;
+    }
+
+    await this.sendAuthorizedCommand(LG_COMMAND.POWER);
+    this.platform.log.debug('TV turned off.');
+    callback(null, false);
+  }
+
+  async getOn(callback: CharacteristicGetCallback) {
+    this.platform.log.debug('Querying TV state...');
+    if (this.currentChannel === null) {
+      return callback(null, false);
+    }
+
+    return callback(null, true);
+  }
 }
