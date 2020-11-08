@@ -44,7 +44,7 @@ export class LgNetcastTV {
       .getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'LG')
       .setCharacteristic(this.platform.Characteristic.Model, this.netcastAccessory.model)
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.netcastAccessory.host);
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.netcastAccessory.mac);
 
     this.service =
       this.accessory.getService(this.platform.Service.Television) ||

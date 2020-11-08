@@ -22,6 +22,7 @@ export interface NetcastAccessory {
   name: string;
   host: string;
   model: string;
+  mac: string;
   accessToken: string;
   channels: ChannelConfig[];
   keyInputDelay: number;
