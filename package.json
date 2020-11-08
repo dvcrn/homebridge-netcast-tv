@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge LG Netcast",
   "name": "homebridge-lg-netcast",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Homebridge plugin to interact with LG Netcast TVs",
   "license": "MIT",
   "repository": {
