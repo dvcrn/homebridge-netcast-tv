@@ -304,7 +304,12 @@ export class LgNetcastTV {
     // check all existing channels and see if the current channel matches with either of them
     // if it does, update the active input source to that
     for (const [i, chan] of this.netcastAccessory.channels.entries()) {
-      if (chan.channel.major === this.currentChannel.major && chan.channel.minor === this.currentChannel.minor) {
+      if (
+        (chan.type === 'hdmi' && chan.channel.inputSourceIdx === this.currentChannel.inputSourceIdx) ||
+        (chan.type === 'tuner' &&
+          chan.channel.major === this.currentChannel.major &&
+          chan.channel.minor === this.currentChannel.minor)
+      ) {
         const currentActiveIdentifier = this.service.getCharacteristic(this.platform.Characteristic.ActiveIdentifier)
           .value;
 
