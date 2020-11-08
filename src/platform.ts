@@ -25,6 +25,7 @@ export interface NetcastAccessory {
   accessToken: string;
   channels: ChannelConfig[];
   keyInputDelay: number;
+  offPauseDuration: number;
 }
 
 interface LgNetcastPlatformConfig extends PlatformConfig {

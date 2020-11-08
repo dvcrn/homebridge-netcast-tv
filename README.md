@@ -46,6 +46,7 @@ Add the platform to your config.json:
 - `mac`: Mac address of the TV _(currently unused)_
 - `accessToken`: Pair code of the TV
 - `keyInputDelay`: Delay in ms to wait before issuing repeated key presses (such as switching input source)
+- `offPauseDuration`: Delay in ms to pause polling for TV status after turning off. This is needed because the TV still responds to channel query requests when it has been turned off
 - `channels`: List of channels that are available
 
 ### Regarding channels
@@ -103,6 +104,7 @@ Important notes here are:
                     "mac": "cc:2d:8c:a4:4a:d6",
                     "accessToken": "xxxxx",
                     "keyInputDelay": 600,
+                    "offPauseDuration": 600000,
                     "channels": [
                         {
                             "name": "AppleTV",

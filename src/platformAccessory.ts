@@ -24,6 +24,9 @@ export class LgNetcastTV {
   private unknownChannelIdentifier: number;
   private unknownChannelName: string;
 
+  private offTimeout: any;
+  private offPause: boolean;
+
   constructor(private readonly platform: LgNetcastPlatform, private readonly accessory: PlatformAccessory) {
     this.currentChannel = null;
     this.netcastAccessory = accessory.context.device;
@@ -32,6 +35,9 @@ export class LgNetcastTV {
 
     this.unknownChannelIdentifier = this.netcastAccessory.channels.length;
     this.unknownChannelName = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+    this.offTimeout = null;
+    this.offPause = false;
 
     // set accessory information
     this.accessory
@@ -286,6 +292,10 @@ export class LgNetcastTV {
    * Updates the current channel state
    */
   async updateCurrentChannel() {
+    if (this.offPause) {
+      return;
+    }
+
     try {
       const sessionId = await this.netcastClient.get_session(this.netcastAccessory.accessToken);
       this.currentChannel = await this.netcastClient.get_current_channel(sessionId);
@@ -422,12 +432,25 @@ export class LgNetcastTV {
     if (value) {
       this.platform.log.debug('TV state changed to on, however I cant turn it on. Just updating state isntead');
       this.platform.log.debug('Use automations to turn the TV on, such as pinging an AppleTV.');
+
+      if (this.offTimeout !== null) {
+        clearTimeout(this.offTimeout);
+        this.offPause = false;
+      }
+
       callback(null, true);
       return;
     }
 
     await this.sendAuthorizedCommand(LG_COMMAND.POWER);
-    this.platform.log.debug('TV turned off.');
+    this.platform.log.debug(
+      `TV turned off. Going to wait ${this.netcastAccessory.offPauseDuration}ms before starting to poll for status again.`,
+    );
+    this.offPause = true;
+    this.offTimeout = setTimeout(() => {
+      this.offPause = false;
+      this.platform.log.debug('Off pause timeout cleared. Going to start polling again.');
+    }, this.netcastAccessory.offPauseDuration);
     callback(null, false);
   }
 
