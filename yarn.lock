@@ -1770,18 +1770,6 @@ v8-compile-cache@^2.0.3:
   resolved "https://registry.yarnpkg.com/v8-compile-cache/-/v8-compile-cache-2.2.0.tgz#9471efa3ef9128d2f7c6a7ca39c4dd6b5055b132"
   integrity sha512-gTpR5XQNKFwOd4clxfnhaqvfqMpqEwr4tOtCyz4MtYZX2JYhfr1JvBFKdS+7K/9rfpZR3VLX+YWBbKoxCgS43Q==
 
-wake_on_lan@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/wake_on_lan/-/wake_on_lan-1.0.0.tgz#516519ee5ab41a652d79c8bd5704fce6ecd4cdb2"
-  integrity sha1-UWUZ7lq0GmUteci9VwT85uzUzbI=
-  dependencies:
-    minimist "^1.2.0"
-
-wakeonlan@^0.1.0:
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/wakeonlan/-/wakeonlan-0.1.0.tgz#b79e73bba84d7d28d9a35795ef020b9eecc32a25"
-  integrity sha1-t55zu6hNfSjZo1eV7wILnuzDKiU=
-
 which@^2.0.1:
   version "2.0.2"
   resolved "https://registry.yarnpkg.com/which/-/which-2.0.2.tgz#7c6a8dd0a636a0327e10b59c9286eee93f3f51b1"

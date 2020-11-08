@@ -6,9 +6,8 @@ import {
   CharacteristicGetCallback,
 } from 'homebridge';
 import { LgNetcastPlatform, NetcastAccessory, ChannelConfig } from './platform';
-import wakeonlan from 'wake_on_lan';
 
-import { Channel, NetcastClient, LG_COMMAND, LG_HANDLE, LG_QUERY } from 'lg-netcast';
+import { Channel, NetcastClient, LG_COMMAND } from 'lg-netcast';
 
 /**
  * Platform Accessory
