@@ -22,11 +22,17 @@ export class LgNetcastTV {
   private currentChannel: Channel | null;
   private channelUpdateInProgress: boolean;
 
+  private unknownChannelIdentifier: number;
+  private unknownChannelName: string;
+
   constructor(private readonly platform: LgNetcastPlatform, private readonly accessory: PlatformAccessory) {
     this.currentChannel = null;
     this.netcastAccessory = accessory.context.device;
     this.netcastClient = new NetcastClient(this.netcastAccessory.host);
     this.channelUpdateInProgress = false;
+
+    this.unknownChannelIdentifier = this.netcastAccessory.channels.length;
+    this.unknownChannelName = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
     // set accessory information
     this.accessory
@@ -60,6 +66,12 @@ export class LgNetcastTV {
         // the value will be the value you set for the Identifier Characteristic
         // on the Input Source service that was selected - see input sources below.
         this.platform.log.info('set Active Identifier => setNewValue: ' + newValue);
+
+        // if unknown identifier, just update it without doing anything
+        if (newValue === this.unknownChannelIdentifier) {
+          callback(null);
+          return;
+        }
 
         const newChannel = this.netcastAccessory.channels[newValue];
         const currentChannel = this.currentChannel;
@@ -292,27 +304,67 @@ export class LgNetcastTV {
     // check all existing channels and see if the current channel matches with either of them
     // if it does, update the active input source to that
     for (const [i, chan] of this.netcastAccessory.channels.entries()) {
-      if (
-        chan.channel.sourceIndex === this.currentChannel.sourceIndex &&
-        chan.channel.inputSourceIdx === this.currentChannel.inputSourceIdx
-      ) {
+      if (chan.channel.major === this.currentChannel.major && chan.channel.minor === this.currentChannel.minor) {
         const currentActiveIdentifier = this.service.getCharacteristic(this.platform.Characteristic.ActiveIdentifier)
           .value;
 
         this.platform.log.debug(`Potentially identified active channel as '${chan.name}'`);
         if (currentActiveIdentifier !== i) {
           this.service.setCharacteristic(this.platform.Characteristic.ActiveIdentifier, i);
+          this.hideWildcardChannel();
         }
         return;
       }
     }
 
-    // TODO: if doesn't match, do a more broader check. For example / terrestrial
-    // console.log('Could not identify channel');
-    // this.service.setCharacteristic(this.platform.Characteristic.ActiveIdentifier, 99);
-    // this.service.setCharacteristic(this.platform.Characteristic.ActiveIdentifier.);
-    // this.service.removeCharacteristic(this.platform.Characteristic.ActiveIdentifier);
-    // this.service.removeCharacteristic
+    this.updateWildcardChannel(this.currentChannel.chname || 'UNKNOWN');
+  }
+
+  updateWildcardChannel(name: string) {
+    this.platform.log.debug(`Creating temporary channel with name '${name}'`);
+    // add extra accessory for UNKNOWN
+    let existingChanService = this.findInputService(this.unknownChannelName);
+    if (existingChanService === null) {
+      existingChanService = this.accessory.addService(
+        this.platform.Service.InputSource,
+        this.unknownChannelName,
+        this.unknownChannelName,
+      );
+    }
+    existingChanService
+      .setCharacteristic(this.platform.Characteristic.ConfiguredName, name)
+      .setCharacteristic(this.platform.Characteristic.Identifier, this.unknownChannelIdentifier)
+      .setCharacteristic(
+        this.platform.Characteristic.InputSourceType,
+        this.platform.Characteristic.InputSourceType.OTHER,
+      )
+      .setCharacteristic(
+        this.platform.Characteristic.IsConfigured,
+        this.platform.Characteristic.IsConfigured.CONFIGURED,
+      )
+      .setCharacteristic(
+        this.platform.Characteristic.CurrentVisibilityState,
+        this.platform.Characteristic.CurrentVisibilityState.SHOWN,
+      );
+    this.service.addLinkedService(existingChanService);
+
+    const currentActiveIdentifier = this.service.getCharacteristic(this.platform.Characteristic.ActiveIdentifier).value;
+    if (currentActiveIdentifier !== this.unknownChannelIdentifier) {
+      this.service.setCharacteristic(this.platform.Characteristic.ActiveIdentifier, this.unknownChannelIdentifier);
+    }
+  }
+
+  hideWildcardChannel() {
+    this.platform.log.debug('Hiding temporary channel');
+    const existingChanService = this.findInputService(this.unknownChannelName);
+    if (existingChanService === null) {
+      return;
+    }
+
+    existingChanService.setCharacteristic(
+      this.platform.Characteristic.CurrentVisibilityState,
+      this.platform.Characteristic.CurrentVisibilityState.HIDDEN,
+    );
   }
 
   findInputService(name: string) {
