@@ -5,8 +5,8 @@ import {
   CharacteristicSetCallback,
   CharacteristicGetCallback,
 } from 'homebridge';
-import { LgNetcastPlatform, DeviceConfig, ChannelConfig, ChannelType } from './platform';
-import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
+import { LgNetcastPlatform, DeviceConfig, ChannelType } from './platform';
+import { PLUGIN_NAME } from './settings';
 
 import { Channel, NetcastClient, LG_COMMAND } from 'lg-netcast';
 
@@ -39,7 +39,7 @@ export class LgNetcastTV {
 
       if ([ChannelType.EXTERNAL, ChannelType.TV].indexOf(deviceConfig.channels[i].type) === -1) {
         platform.log.warn(
-          "Channel type not set, defaulting to 'tv'. You should change that if this channel is an HDMI device",
+          'Channel type not set, defaulting to "tv". You should change that if this channel is an HDMI device',
         );
         deviceConfig.channels[i].type = ChannelType.TV;
       }
