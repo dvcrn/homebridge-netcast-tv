@@ -11,9 +11,14 @@ import {
 import { LgNetcastTV } from './platformAccessory';
 import { Channel } from 'lg-netcast';
 
+export enum ChannelType {
+  TV = 'tv',
+  EXTERNAL = 'external',
+}
+
 export interface ChannelConfig {
   name: string;
-  type: string;
+  type: ChannelType;
   channel: Channel;
 }
 

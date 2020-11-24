@@ -22,7 +22,7 @@ Homebridge plugin for interacting with LG Netcast-based TVs (2012, 2013)
 ## Installation
 
 ```
-npm install -g homebridge-lg-netcast
+npm install -g homebridge-netcast-tv
 ```
 
 ## Setup
@@ -43,7 +43,7 @@ Add the platform to your config.json:
 
 - `name`: Name of the accessory
 - `host`: IP + Port of your TV
-- `mac`: Mac address of the TV _(currently unused)_
+- `mac`: Mac address of the TV
 - `accessToken`: Pair code of the TV
 - `keyInputDelay`: Delay in ms to wait before issuing repeated key presses (such as switching input source)
 - `offPauseDuration`: Delay in ms to pause polling for TV status after turning off. This is needed because the TV still responds to channel query requests when it has been turned off
@@ -78,7 +78,7 @@ Important notes here are:
 
 **For HDMI devices**: Specify only `inputSourceType` and `inputSourceIdx`. Set `type` to "hdmi", this is very important!
 
-**For channels**: Specify `type` = "tuner" and the following keys:
+**For channels**: Specify `type` = "tv" and the following keys:
 
 ```
 "sourceIndex": "1",
@@ -108,7 +108,7 @@ Important notes here are:
                     "channels": [
                         {
                             "name": "AppleTV",
-                            "type": "hdmi",
+                            "type": "external",
                             "channel": {
                                 "inputSourceType": "6",
                                 "inputSourceIdx": "3"
@@ -116,7 +116,7 @@ Important notes here are:
                         },
                         {
                             "name": "Chromecast",
-                            "type": "hdmi",
+                            "type": "external",
                             "channel": {
                                 "inputSourceType": "6",
                                 "inputSourceIdx": "4"
@@ -124,7 +124,7 @@ Important notes here are:
                         },
                         {
                             "name": "Nihon TV",
-                            "type": "tuner",
+                            "type": "tv",
                             "channel": {
                                 "sourceIndex": "1",
                                 "physicalNum": "25",

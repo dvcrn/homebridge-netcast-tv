@@ -5,7 +5,7 @@ import {
   CharacteristicSetCallback,
   CharacteristicGetCallback,
 } from 'homebridge';
-import { LgNetcastPlatform, DeviceConfig, ChannelConfig } from './platform';
+import { LgNetcastPlatform, DeviceConfig, ChannelConfig, ChannelType } from './platform';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 
 import { Channel, NetcastClient, LG_COMMAND } from 'lg-netcast';
@@ -246,7 +246,7 @@ export class LgNetcastTV {
           }
         }
 
-        if (newChannel.type === 'tuner') {
+        if (newChannel.type === ChannelType.TV) {
           const sessionId = await this.netcastClient.get_session(this.deviceConfig.accessToken);
           await this.netcastClient.change_channel(newChannel.channel, sessionId);
         }
@@ -401,8 +401,8 @@ export class LgNetcastTV {
     // if it does, update the active input source to that
     for (const [i, chan] of this.deviceConfig.channels.entries()) {
       if (
-        (chan.type === 'hdmi' && chan.channel.inputSourceIdx === this.currentChannel.inputSourceIdx) ||
-        (chan.type === 'tuner' &&
+        (chan.type === ChannelType.EXTERNAL && chan.channel.inputSourceIdx === this.currentChannel.inputSourceIdx) ||
+        (chan.type === ChannelType.TV &&
           chan.channel.major === this.currentChannel.major &&
           chan.channel.minor === this.currentChannel.minor)
       ) {
