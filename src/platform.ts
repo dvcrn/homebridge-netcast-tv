@@ -10,6 +10,7 @@ import {
 
 import { LgNetcastTV } from './platformAccessory';
 import { Channel } from 'lg-netcast';
+import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 
 export enum ChannelType {
   TV = 'tv',
@@ -63,6 +64,10 @@ export class LgNetcastPlatform implements DynamicPlatformPlugin {
   configureAccessory(accessory: PlatformAccessory) {
     this.log.info('Loading accessory from cache:', accessory.displayName);
     this.devices.push(accessory);
+  }
+
+  removeAccessory(accessory) {
+    this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
   }
 
   discoverDevices() {

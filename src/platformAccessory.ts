@@ -27,12 +27,23 @@ export class LgNetcastTV {
   constructor(private readonly platform: LgNetcastPlatform, private readonly deviceConfig: DeviceConfig) {
     deviceConfig.accessToken = deviceConfig.accessToken || '';
     deviceConfig.name = deviceConfig.name || 'LG TV';
-    deviceConfig.host = deviceConfig.host || '';
+    deviceConfig.host = deviceConfig.host || '192.168.1.1';
     deviceConfig.mac = deviceConfig.mac || '00:00:00:00:00';
     deviceConfig.accessToken = deviceConfig.accessToken || '';
     deviceConfig.channels = deviceConfig.channels || [];
     deviceConfig.keyInputDelay = deviceConfig.keyInputDelay || 600; // delay between issuing commands
     deviceConfig.offPauseDuration = deviceConfig.offPauseDuration || 600000; // how long to wait after turning off before polling again
+
+    for (let i = 0; i < deviceConfig.channels.length; i++) {
+      deviceConfig.channels[i].name = deviceConfig.channels[i].name || 'Unnamed Channel';
+
+      if ([ChannelType.EXTERNAL, ChannelType.TV].indexOf(deviceConfig.channels[i].type) === -1) {
+        platform.log.warn(
+          "Channel type not set, defaulting to 'tv'. You should change that if this channel is an HDMI device",
+        );
+        deviceConfig.channels[i].type = ChannelType.TV;
+      }
+    }
 
     const uuid = platform.api.hap.uuid.generate(deviceConfig.mac + deviceConfig.host);
     this.accessory = new platform.api.platformAccessory(
@@ -487,7 +498,7 @@ export class LgNetcastTV {
     for (const ser of this.accessory.services) {
       for (const linkedSer of ser.linkedServices) {
         if (linkedSer.displayName === name) {
-          this.platform.log.info('Found existing input service: ', linkedSer.displayName);
+          this.platform.log.debug('Found existing input service: ', linkedSer.displayName);
           return linkedSer;
         }
       }
