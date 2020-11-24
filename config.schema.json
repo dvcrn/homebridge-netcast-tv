@@ -22,7 +22,7 @@
           },
           "host": {
             "title": "TV ip address",
-            "description": "The ip address of your TV + port.",
+            "description": "The ip address of your TV.",
             "type": "string",
             "format": "ipv4",
             "required": true
@@ -41,31 +41,32 @@
           },
           "keyInputDelay": {
             "title": "Key Input Delay",
-            "description": "Time in ms to wait between key presses",
+            "description": "Time in ms to wait between key presses.",
             "type": "number",
             "default": 600
           },
           "offPauseDuration": {
             "title": "Pause Duration after turning off",
-            "description": "Time in ms to wait before polling the status again",
+            "description": "Time in ms to wait before polling the status again.",
             "type": "number",
             "default": 600000
           },
           "channels": {
             "type": "array",
+            "description": "Check the [README](https://github.com/dvcrn/homebridge-netcast-tv#regarding-channels) for infos on Channels",
             "items": {
               "type": "object",
               "properties": {
                 "name": {
                   "title": "Name",
-                  "description": "The name of the Channel",
+                  "description": "The name of the Channel.",
                   "type": "string",
                   "minLength": 1,
                   "required": true
                 },
                 "type": {
                   "title": "Channel Type",
-                  "description": "Whether the channel is TV or External (such as HDMI)",
+                  "description": "Whether the channel is TV or External (such as HDMI).",
                   "type": "string",
                   "minLength": 1,
                   "required": true,

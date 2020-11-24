@@ -34,6 +34,11 @@ export class LgNetcastTV {
     deviceConfig.keyInputDelay = deviceConfig.keyInputDelay || 600; // delay between issuing commands
     deviceConfig.offPauseDuration = deviceConfig.offPauseDuration || 600000; // how long to wait after turning off before polling again
 
+    // Append port if needed
+    if (deviceConfig.host.indexOf(':') === -1) {
+      deviceConfig.host = deviceConfig.host + ':8080';
+    }
+
     for (let i = 0; i < deviceConfig.channels.length; i++) {
       deviceConfig.channels[i].name = deviceConfig.channels[i].name || 'Unnamed Channel';
 

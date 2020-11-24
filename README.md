@@ -42,7 +42,7 @@ netcast-cli --host 192.168.1.14:8080
 Add the platform to your config.json:
 
 - `name`: Name of the accessory
-- `host`: IP + Port of your TV
+- `host`: IP of your TV
 - `mac`: Mac address of the TV
 - `accessToken`: Pair code of the TV
 - `keyInputDelay`: Delay in ms to wait before issuing repeated key presses (such as switching input source)
@@ -100,7 +100,7 @@ Important notes here are:
                 {
                     "accessory": "LgNetcastTV",
                     "name": "TestTV",
-                    "host": "192.168.1.14:8080",
+                    "host": "192.168.1.14",
                     "mac": "cc:2d:8c:a4:4a:d6",
                     "accessToken": "xxxxx",
                     "keyInputDelay": 600,
