@@ -25,17 +25,24 @@ Homebridge plugin for interacting with LG Netcast-based TVs (2012, 2013)
 npm install -g homebridge-netcast-tv
 ```
 
+TVs are exposed as separate accessories that you need to pair. This is a restriction of the HomeKit API, so after adding this accessory check your log files for the pairing code:
+
+```
+[11/24/2020, 8:29:52 PM] LG TV is running on port 60335.
+[11/24/2020, 8:29:52 PM] Please add [LG TV] manually in Home app. Setup Code: 618-65-640
+```
+
 ## Setup
 
-To pair with the TV, you need to get it to display a valid access token. If you leave out the `access_token` key it should prompt it for you.
+To pair with the TV, you need to get it to display a valid access token.
 
-This repository also comes with a `netcast-cli` helper tool that you can use to query the TV. Not specifying anything will prompt the access token / pair code:
+This repository also comes with a `netcast-cli` helper tool that you can use to query the TV:
 
 ```
-netcast-cli --host 192.168.1.14:8080
+netcast-cli --command access_token --host 192.168.1.6
 ```
 
-**Note**: The default port is `:8080`, make sure you specify that.
+**Note**: The default port is `:8080`. Not specifying a port will use the default.
 
 ## Configuration
 
