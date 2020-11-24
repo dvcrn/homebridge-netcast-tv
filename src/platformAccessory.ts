@@ -10,11 +10,6 @@ import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 
 import { Channel, NetcastClient, LG_COMMAND } from 'lg-netcast';
 
-/**
- * Platform Accessory
- * An instance of this class is created for each accessory your platform registers
- * Each accessory may expose multiple services of different service types.
- */
 export class LgNetcastTV {
   private service: Service;
   private netcastClient: NetcastClient;
@@ -37,40 +32,48 @@ export class LgNetcastTV {
       platform.api.hap.Categories.TELEVISION,
     );
 
-    this.currentChannel = null;
+    this.service =
+      this.accessory.getService(this.platform.Service.Television) ||
+      this.accessory.addService(this.platform.Service.Television);
+
     this.netcastClient = new NetcastClient(this.netcastAccessory.host);
-    this.channelUpdateInProgress = false;
 
     this.unknownChannelIdentifier = this.netcastAccessory.channels.length;
     this.unknownChannelName = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-
-    console.log('unknown chan name', this.unknownChannelName);
-
     this.offTimeout = null;
     this.offPause = false;
+    this.currentChannel = null;
+    this.channelUpdateInProgress = false;
 
-    // set accessory information
+    this.initTvService();
+    this.initTvAccessory();
+    this.initRemoteControlService();
+    this.initSpeakerService();
+    this.initInputSources();
+
+    // interval for updating the current active identifier
+    this.updateCurrentChannel();
+    setInterval(() => {
+      this.updateCurrentChannel();
+    }, 5000);
+
+    platform.api.publishExternalAccessories(PLUGIN_NAME, [this.accessory]);
+  }
+
+  /**
+   * Initializes the tv accessory itself
+   */
+  initTvAccessory() {
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'LG')
       .setCharacteristic(this.platform.Characteristic.Model, this.netcastAccessory.model)
       .setCharacteristic(this.platform.Characteristic.SerialNumber, this.netcastAccessory.mac);
+  }
 
-    this.service =
-      this.accessory.getService(this.platform.Service.Television) ||
-      this.accessory.addService(this.platform.Service.Television);
-
-    // set the service name, this is what is displayed as the default name on the Home app
-    // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    this.service.setCharacteristic(this.platform.Characteristic.Active, this.platform.Characteristic.Active.ACTIVE);
-
-    // register handlers for the On/Off Characteristic
+  initTvService() {
     this.service
-      .getCharacteristic(this.platform.Characteristic.Active)
-      .on('set', this.setOn.bind(this)) // SET - bind to the `setOn` method below
-      .on('get', this.getOn.bind(this)); // GET - bind to the `getOn` method below
-
-    this.service
+      .setCharacteristic(this.platform.Characteristic.Active, this.platform.Characteristic.Active.ACTIVE)
       .setCharacteristic(this.platform.Characteristic.ActiveIdentifier, 1)
       .setCharacteristic(this.platform.Characteristic.ConfiguredName, this.netcastAccessory.name)
       .setCharacteristic(this.platform.Characteristic.Name, this.netcastAccessory.name)
@@ -79,41 +82,48 @@ export class LgNetcastTV {
         this.platform.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
       );
 
-    // handle input source changes
+    // register handlers for the On/Off Characteristic
     this.service
-      .getCharacteristic(this.platform.Characteristic.ActiveIdentifier)
-      .on('set', async (newValue, callback) => {
-        // the value will be the value you set for the Identifier Characteristic
-        // on the Input Source service that was selected - see input sources below.
-        this.platform.log.info('set Active Identifier => setNewValue: ' + newValue);
+      .getCharacteristic(this.platform.Characteristic.Active)
+      .on('set', async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+        if (value) {
+          this.platform.log.debug('TV state changed to on, however I cant turn it on. Just updating state isntead');
+          this.platform.log.debug('Use automations to turn the TV on, such as pinging an AppleTV.');
 
-        // if unknown identifier, just update it without doing anything
-        if (newValue === this.unknownChannelIdentifier) {
-          callback(null);
+          if (this.offTimeout !== null) {
+            clearTimeout(this.offTimeout);
+            this.offPause = false;
+          }
+
+          callback(null, true);
           return;
         }
 
-        const newChannel = this.netcastAccessory.channels[newValue];
-        const currentChannel = this.currentChannel;
-
-        this.channelUpdateInProgress = true;
-        if (newChannel.channel.inputSourceIdx !== undefined) {
-          // if different inputsourceidx, we have to manually switch to the channel
-          if (newChannel.channel.inputSourceIdx !== currentChannel?.inputSourceIdx) {
-            await this.switchToSourceIdx(parseInt(newChannel.channel.inputSourceIdx));
-            await this.wait(3000);
-          }
+        // After turning off, issue a pause timeout for waiting with polling again
+        // Netcast TVs take a while before they deactivate their network card, so without the timeout
+        // it would just immediately appear as "on" again
+        await this.sendAuthorizedCommand(LG_COMMAND.POWER);
+        this.platform.log.debug(
+          `TV turned off. Going to wait ${this.netcastAccessory.offPauseDuration}ms before starting to poll for status again.`,
+        );
+        this.offPause = true;
+        this.offTimeout = setTimeout(() => {
+          this.offPause = false;
+          this.platform.log.debug('Off pause timeout cleared. Going to start polling again.');
+        }, this.netcastAccessory.offPauseDuration);
+        callback(null, false);
+      })
+      .on('get', (callback: CharacteristicGetCallback) => {
+        this.platform.log.debug('Querying TV state...');
+        if (this.currentChannel === null) {
+          return callback(null, false);
         }
 
-        if (newChannel.type === 'tuner') {
-          const sessionId = await this.netcastClient.get_session(this.netcastAccessory.accessToken);
-          await this.netcastClient.change_channel(newChannel.channel, sessionId);
-        }
-
-        this.channelUpdateInProgress = false;
-        callback(null);
+        return callback(null, true);
       });
+  }
 
+  initRemoteControlService() {
     this.service.getCharacteristic(this.platform.Characteristic.RemoteKey).on('set', async (newValue, callback) => {
       switch (newValue) {
         case this.platform.Characteristic.RemoteKey.REWIND: {
@@ -173,7 +183,9 @@ export class LgNetcastTV {
       // don't forget to callback!
       callback(null);
     });
+  }
 
+  initSpeakerService() {
     const speakerService =
       this.accessory.getService(this.platform.Service.TelevisionSpeaker) ||
       this.accessory.addService(this.platform.Service.TelevisionSpeaker);
@@ -196,7 +208,45 @@ export class LgNetcastTV {
         }
         callback(null);
       });
+  }
 
+  initInputSources() {
+    // Handler for when the user switches to a different input source
+    this.service
+      .getCharacteristic(this.platform.Characteristic.ActiveIdentifier)
+      .on('set', async (newValue, callback) => {
+        // the value will be the value you set for the Identifier Characteristic
+        // on the Input Source service that was selected - see input sources below.
+        this.platform.log.info('set Active Identifier => setNewValue: ' + newValue);
+
+        // if unknown identifier, just update it without doing anything
+        if (newValue === this.unknownChannelIdentifier) {
+          callback(null);
+          return;
+        }
+
+        const newChannel = this.netcastAccessory.channels[newValue];
+        const currentChannel = this.currentChannel;
+
+        this.channelUpdateInProgress = true;
+        if (newChannel.channel.inputSourceIdx !== undefined) {
+          // if different inputsourceidx, we have to manually switch to the channel
+          if (newChannel.channel.inputSourceIdx !== currentChannel?.inputSourceIdx) {
+            await this.switchToSourceIdx(parseInt(newChannel.channel.inputSourceIdx));
+            await this.wait(3000);
+          }
+        }
+
+        if (newChannel.type === 'tuner') {
+          const sessionId = await this.netcastClient.get_session(this.netcastAccessory.accessToken);
+          await this.netcastClient.change_channel(newChannel.channel, sessionId);
+        }
+
+        this.channelUpdateInProgress = false;
+        callback(null);
+      });
+
+    // Init all configurated user channels if they don't exist yet
     for (const [i, chan] of this.netcastAccessory.channels.entries()) {
       let existingChanService = this.findInputService(chan.name);
       if (existingChanService === null) {
@@ -220,15 +270,25 @@ export class LgNetcastTV {
       this.service.addLinkedService(existingChanService);
     }
 
-    this.removeUnusedInputServices(this.netcastAccessory.channels);
+    // === Remove input sources that are no longer being used
 
-    // interval for updating the current active identifier
-    this.updateCurrentChannel();
-    setInterval(() => {
-      this.updateCurrentChannel();
-    }, 5000);
+    // Create map for easier access
+    const channelNameMap = {};
+    for (const c of this.netcastAccessory.channels) {
+      channelNameMap[c.name] = null;
+    }
 
-    platform.api.publishExternalAccessories(PLUGIN_NAME, [this.accessory]);
+    // Iterate through all the currently linked services
+    // If the service displayName is not inside the access map, remove it
+    for (const ser of this.accessory.services) {
+      for (const linkedSer of ser.linkedServices) {
+        if (channelNameMap[linkedSer.displayName] === undefined) {
+          this.platform.log.info('Removed unused input service: ', linkedSer.displayName);
+          this.service.removeLinkedService(linkedSer);
+          this.accessory.removeService(linkedSer);
+        }
+      }
+    }
   }
 
   wait(ms: number) {
@@ -237,6 +297,12 @@ export class LgNetcastTV {
     });
   }
 
+  /**
+   * Sends an authorized command to the TV
+   * authorized meaning a valid session will be used for issuing the command
+   *
+   * @param      {LG_COMMAND}  cmd     The command
+   */
   async sendAuthorizedCommand(cmd: LG_COMMAND) {
     this.platform.log.debug('Sending command to TV: ', cmd, LG_COMMAND[cmd]);
     const sessionId = await this.netcastClient.get_session(this.netcastAccessory.accessToken);
@@ -357,7 +423,6 @@ export class LgNetcastTV {
   updateWildcardChannel(name: string) {
     this.platform.log.debug(`Creating temporary channel with name '${name}'`);
     // add extra accessory for UNKNOWN
-    console.log('unknown name: ', this.unknownChannelName);
     let existingChanService = this.findInputService(this.unknownChannelName);
     if (existingChanService === null) {
       existingChanService = this.accessory.addService(
@@ -420,57 +485,5 @@ export class LgNetcastTV {
     }
 
     return null;
-  }
-
-  async removeUnusedInputServices(channelConfig: ChannelConfig[]) {
-    const channelNameMap = {};
-    for (const c of channelConfig) {
-      channelNameMap[c.name] = null;
-    }
-
-    for (const ser of this.accessory.services) {
-      for (const linkedSer of ser.linkedServices) {
-        if (channelNameMap[linkedSer.displayName] === undefined) {
-          this.platform.log.info('Removed unused input service: ', linkedSer.displayName);
-          this.service.removeLinkedService(linkedSer);
-          this.accessory.removeService(linkedSer);
-        }
-      }
-    }
-  }
-
-  async setOn(value: CharacteristicValue, callback: CharacteristicSetCallback) {
-    if (value) {
-      this.platform.log.debug('TV state changed to on, however I cant turn it on. Just updating state isntead');
-      this.platform.log.debug('Use automations to turn the TV on, such as pinging an AppleTV.');
-
-      if (this.offTimeout !== null) {
-        clearTimeout(this.offTimeout);
-        this.offPause = false;
-      }
-
-      callback(null, true);
-      return;
-    }
-
-    await this.sendAuthorizedCommand(LG_COMMAND.POWER);
-    this.platform.log.debug(
-      `TV turned off. Going to wait ${this.netcastAccessory.offPauseDuration}ms before starting to poll for status again.`,
-    );
-    this.offPause = true;
-    this.offTimeout = setTimeout(() => {
-      this.offPause = false;
-      this.platform.log.debug('Off pause timeout cleared. Going to start polling again.');
-    }, this.netcastAccessory.offPauseDuration);
-    callback(null, false);
-  }
-
-  async getOn(callback: CharacteristicGetCallback) {
-    this.platform.log.debug('Querying TV state...');
-    if (this.currentChannel === null) {
-      return callback(null, false);
-    }
-
-    return callback(null, true);
   }
 }
