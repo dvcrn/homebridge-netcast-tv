@@ -1,4 +1,4 @@
-# homebridge-lg-netcast
+# homebridge-netcast-tv
 
 Homebridge plugin for interacting with LG Netcast-based TVs (2012, 2013)
 
