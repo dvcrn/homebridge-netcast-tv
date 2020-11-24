@@ -6,6 +6,7 @@ import {
   CharacteristicGetCallback,
 } from 'homebridge';
 import { LgNetcastPlatform, NetcastAccessory, ChannelConfig } from './platform';
+import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 
 import { Channel, NetcastClient, LG_COMMAND } from 'lg-netcast';
 
@@ -17,7 +18,6 @@ import { Channel, NetcastClient, LG_COMMAND } from 'lg-netcast';
 export class LgNetcastTV {
   private service: Service;
   private netcastClient: NetcastClient;
-  private netcastAccessory: NetcastAccessory;
   private currentChannel: Channel | null;
   private channelUpdateInProgress: boolean;
 
@@ -27,14 +27,24 @@ export class LgNetcastTV {
   private offTimeout: NodeJS.Timeout | null;
   private offPause: boolean;
 
-  constructor(private readonly platform: LgNetcastPlatform, private readonly accessory: PlatformAccessory) {
+  private accessory: PlatformAccessory;
+
+  constructor(private readonly platform: LgNetcastPlatform, private readonly netcastAccessory: NetcastAccessory) {
+    const uuid = platform.api.hap.uuid.generate(netcastAccessory.mac + netcastAccessory.host);
+    this.accessory = new platform.api.platformAccessory(
+      netcastAccessory.name,
+      uuid,
+      platform.api.hap.Categories.TELEVISION,
+    );
+
     this.currentChannel = null;
-    this.netcastAccessory = accessory.context.device;
     this.netcastClient = new NetcastClient(this.netcastAccessory.host);
     this.channelUpdateInProgress = false;
 
     this.unknownChannelIdentifier = this.netcastAccessory.channels.length;
     this.unknownChannelName = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+    console.log('unknown chan name', this.unknownChannelName);
 
     this.offTimeout = null;
     this.offPause = false;
@@ -217,6 +227,8 @@ export class LgNetcastTV {
     setInterval(() => {
       this.updateCurrentChannel();
     }, 5000);
+
+    platform.api.publishExternalAccessories(PLUGIN_NAME, [this.accessory]);
   }
 
   wait(ms: number) {
@@ -345,6 +357,7 @@ export class LgNetcastTV {
   updateWildcardChannel(name: string) {
     this.platform.log.debug(`Creating temporary channel with name '${name}'`);
     // add extra accessory for UNKNOWN
+    console.log('unknown name: ', this.unknownChannelName);
     let existingChanService = this.findInputService(this.unknownChannelName);
     if (existingChanService === null) {
       existingChanService = this.accessory.addService(
