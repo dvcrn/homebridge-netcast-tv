@@ -1,85 +1,107 @@
 {
-  "pluginAlias": "lg-netcast",
+  "pluginAlias": "netcasttv",
   "pluginType": "platform",
   "singular": true,
+  "headerDisplay": "Homebridge plugin for LG Netcast TVs",
+  "footerDisplay": "For a detailed description, see the [README](https://github.com/dvcrn/homebridge-netcast-tv)",
   "schema": {
-    "type": "object",
-    "properties": {
-      "accessories": {
-        "title": "TV accessories",
-        "type": "array",
-        "default": [],
-        "items": {
-          "host": {
-            "title": "Host + Port",
+    "devices": {
+      "title": "Devices",
+      "type": "array",
+      "required": true,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "description": "The name of your TV.",
             "type": "string",
-            "required": true,
-            "default": "192.168.1.1:8080",
-            "description": "Default port is :8080. Make sure you don't forget specifying that. "
+            "default": "LG TV",
+            "minLength": 1,
+            "required": true
+          },
+          "host": {
+            "title": "TV ip address",
+            "description": "The ip address of your TV + port.",
+            "type": "string",
+            "format": "ipv4",
+            "required": true
           },
           "mac": {
-            "title": "Mac Address",
+            "title": "TV mac address",
+            "description": "The mac address of your TV.",
             "type": "string",
-            "required": true,
-            "default": "ff:ff:ff:ff:ff:ff"
+            "required": true
           },
           "accessToken": {
-            "title": "Access Token / Pair Key",
-            "description": "",
+            "title": "TV access token",
+            "description": "Access token of the TV",
             "type": "string",
             "required": true
           },
           "keyInputDelay": {
-            "title": "Key Input Delay (ms)",
+            "title": "Key Input Delay",
+            "description": "Time in ms to wait between key presses",
             "type": "number",
-            "required": false,
-            "default": 600,
-            "description": "Time to wait in between key presses for actions such as switching input sources"
+            "default": 600
           },
           "offPauseDuration": {
-            "title": "Off Pause Duration (ms)",
+            "title": "Pause Duration after turning off",
+            "description": "Time in ms to wait before polling the status again",
             "type": "number",
-            "required": false,
-            "default": 600000,
-            "description": "Time to wait after the TV has been turned off before starting to query for the status again. This is needed because the TV still responds to channel API requests when it's 'off', until it deactivates it's network card."
-          },
-          "name": {
-            "title": "Name",
-            "type": "string",
-            "required": true,
-            "default": "LG Netcast TV"
+            "default": 600000
           },
           "channels": {
             "type": "array",
-            "default": [],
             "items": {
-              "name": {
-                "type": "string"
-              },
-              "type": {
-                "type": "string",
-                "enum": ["hdmi", "tuner"]
-              },
-              "channel": {
-                "type": "object",
-                "properties": {
-                  "inputSourceType": {
-                    "type": "string"
-                  },
-                  "inputSourceIdx": {
-                    "type": "string"
-                  },
-                  "major": {
-                    "type": "string"
-                  },
-                  "minor": {
-                    "type": "string"
-                  },
-                  "sourceIndex": {
-                    "type": "string"
-                  },
-                  "physicalNum": {
-                    "type": "string"
+              "type": "object",
+              "properties": {
+                "name": {
+                  "title": "Name",
+                  "description": "The name of the Channel",
+                  "type": "string",
+                  "minLength": 1,
+                  "required": true
+                },
+                "type": {
+                  "title": "Channel Type",
+                  "description": "Whether the channel is TV or External (such as HDMI)",
+                  "type": "string",
+                  "minLength": 1,
+                  "required": true,
+                  "enum": ["tv", "external"]
+                },
+                "channel": {
+                  "type": "object",
+                  "properties": {
+                    "inputSourceType": {
+                      "type": "string",
+                      "title": "inputSourceType"
+                    },
+                    "inputSourceIdx": {
+                      "type": "string",
+                      "title": "inputSourceIdx"
+                    },
+                    "sourceIndex": {
+                      "type": "string",
+                      "title": "sourceIndex"
+                    },
+                    "physicalNum": {
+                      "type": "string",
+                      "title": "physicalNum"
+                    },
+                    "major": {
+                      "type": "string",
+                      "title": "major"
+                    },
+                    "minor": {
+                      "type": "string",
+                      "title": "minor"
+                    },
+                    "minor": {
+                      "type": "string",
+                      "title": "minor"
+                    }
                   }
                 }
               }
