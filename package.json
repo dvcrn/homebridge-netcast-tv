@@ -1,12 +1,12 @@
 {
-  "displayName": "Homebridge LG Netcast",
-  "name": "homebridge-lg-netcast",
+  "displayName": "Homebridge Netcast TV",
+  "name": "homebridge-netcast-tv",
   "version": "1.1.1",
   "description": "Homebridge plugin to interact with LG Netcast TVs",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dvcrn/homebridge-lg-netcast"
+    "url": "https://github.com/dvcrn/homebridge-netcast-tv"
   },
   "bugs": {
     "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME/issues"
