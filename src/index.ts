@@ -1,7 +1,7 @@
 import { API } from 'homebridge';
 
 import { PLATFORM_NAME } from './settings';
-import { LgNetcastPlatform } from './platform'; 
+import { LgNetcastPlatform } from './platform';
 
 /**
  * This method registers the platform with Homebridge

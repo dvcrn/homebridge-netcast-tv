@@ -5,7 +5,7 @@ import {
   CharacteristicSetCallback,
   CharacteristicGetCallback,
 } from 'homebridge';
-import { LgNetcastPlatform, NetcastAccessory, ChannelConfig } from './platform';
+import { LgNetcastPlatform, DeviceConfig, ChannelConfig } from './platform';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 
 import { Channel, NetcastClient, LG_COMMAND } from 'lg-netcast';
@@ -24,10 +24,19 @@ export class LgNetcastTV {
 
   private accessory: PlatformAccessory;
 
-  constructor(private readonly platform: LgNetcastPlatform, private readonly netcastAccessory: NetcastAccessory) {
-    const uuid = platform.api.hap.uuid.generate(netcastAccessory.mac + netcastAccessory.host);
+  constructor(private readonly platform: LgNetcastPlatform, private readonly deviceConfig: DeviceConfig) {
+    deviceConfig.accessToken = deviceConfig.accessToken || '';
+    deviceConfig.name = deviceConfig.name || 'LG TV';
+    deviceConfig.host = deviceConfig.host || '';
+    deviceConfig.mac = deviceConfig.mac || '00:00:00:00:00';
+    deviceConfig.accessToken = deviceConfig.accessToken || '';
+    deviceConfig.channels = deviceConfig.channels || [];
+    deviceConfig.keyInputDelay = deviceConfig.keyInputDelay || 600; // delay between issuing commands
+    deviceConfig.offPauseDuration = deviceConfig.offPauseDuration || 600000; // how long to wait after turning off before polling again
+
+    const uuid = platform.api.hap.uuid.generate(deviceConfig.mac + deviceConfig.host);
     this.accessory = new platform.api.platformAccessory(
-      netcastAccessory.name,
+      deviceConfig.name,
       uuid,
       platform.api.hap.Categories.TELEVISION,
     );
@@ -36,9 +45,9 @@ export class LgNetcastTV {
       this.accessory.getService(this.platform.Service.Television) ||
       this.accessory.addService(this.platform.Service.Television);
 
-    this.netcastClient = new NetcastClient(this.netcastAccessory.host);
+    this.netcastClient = new NetcastClient(this.deviceConfig.host);
 
-    this.unknownChannelIdentifier = this.netcastAccessory.channels.length;
+    this.unknownChannelIdentifier = this.deviceConfig.channels.length;
     this.unknownChannelName = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     this.offTimeout = null;
     this.offPause = false;
@@ -67,16 +76,16 @@ export class LgNetcastTV {
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'LG')
-      .setCharacteristic(this.platform.Characteristic.Model, this.netcastAccessory.model)
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.netcastAccessory.mac);
+      .setCharacteristic(this.platform.Characteristic.Model, this.deviceConfig.model)
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.deviceConfig.mac);
   }
 
   initTvService() {
     this.service
       .setCharacteristic(this.platform.Characteristic.Active, this.platform.Characteristic.Active.ACTIVE)
       .setCharacteristic(this.platform.Characteristic.ActiveIdentifier, 1)
-      .setCharacteristic(this.platform.Characteristic.ConfiguredName, this.netcastAccessory.name)
-      .setCharacteristic(this.platform.Characteristic.Name, this.netcastAccessory.name)
+      .setCharacteristic(this.platform.Characteristic.ConfiguredName, this.deviceConfig.name)
+      .setCharacteristic(this.platform.Characteristic.Name, this.deviceConfig.name)
       .setCharacteristic(
         this.platform.Characteristic.SleepDiscoveryMode,
         this.platform.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE,
@@ -104,13 +113,13 @@ export class LgNetcastTV {
         // it would just immediately appear as "on" again
         await this.sendAuthorizedCommand(LG_COMMAND.POWER);
         this.platform.log.debug(
-          `TV turned off. Going to wait ${this.netcastAccessory.offPauseDuration}ms before starting to poll for status again.`,
+          `TV turned off. Going to wait ${this.deviceConfig.offPauseDuration}ms before starting to poll for status again.`,
         );
         this.offPause = true;
         this.offTimeout = setTimeout(() => {
           this.offPause = false;
           this.platform.log.debug('Off pause timeout cleared. Going to start polling again.');
-        }, this.netcastAccessory.offPauseDuration);
+        }, this.deviceConfig.offPauseDuration);
         callback(null, false);
       })
       .on('get', (callback: CharacteristicGetCallback) => {
@@ -225,7 +234,7 @@ export class LgNetcastTV {
           return;
         }
 
-        const newChannel = this.netcastAccessory.channels[newValue];
+        const newChannel = this.deviceConfig.channels[newValue];
         const currentChannel = this.currentChannel;
 
         this.channelUpdateInProgress = true;
@@ -238,7 +247,7 @@ export class LgNetcastTV {
         }
 
         if (newChannel.type === 'tuner') {
-          const sessionId = await this.netcastClient.get_session(this.netcastAccessory.accessToken);
+          const sessionId = await this.netcastClient.get_session(this.deviceConfig.accessToken);
           await this.netcastClient.change_channel(newChannel.channel, sessionId);
         }
 
@@ -247,7 +256,7 @@ export class LgNetcastTV {
       });
 
     // Init all configurated user channels if they don't exist yet
-    for (const [i, chan] of this.netcastAccessory.channels.entries()) {
+    for (const [i, chan] of this.deviceConfig.channels.entries()) {
       let existingChanService = this.findInputService(chan.name);
       if (existingChanService === null) {
         this.platform.log.info('Creating new input service: ', chan.name);
@@ -274,7 +283,7 @@ export class LgNetcastTV {
 
     // Create map for easier access
     const channelNameMap = {};
-    for (const c of this.netcastAccessory.channels) {
+    for (const c of this.deviceConfig.channels) {
       channelNameMap[c.name] = null;
     }
 
@@ -305,7 +314,7 @@ export class LgNetcastTV {
    */
   async sendAuthorizedCommand(cmd: LG_COMMAND) {
     this.platform.log.debug('Sending command to TV: ', cmd, LG_COMMAND[cmd]);
-    const sessionId = await this.netcastClient.get_session(this.netcastAccessory.accessToken);
+    const sessionId = await this.netcastClient.get_session(this.deviceConfig.accessToken);
     return this.netcastClient.send_command(cmd, sessionId);
   }
 
@@ -349,7 +358,7 @@ export class LgNetcastTV {
       const diff = currentIdx - idx - 1;
       for (let i = 1; i <= diff; i++) {
         await this.sendAuthorizedCommand(LG_COMMAND.LEFT);
-        await this.wait(this.netcastAccessory.keyInputDelay);
+        await this.wait(this.deviceConfig.keyInputDelay);
       }
       await this.sendAuthorizedCommand(LG_COMMAND.OK);
     }
@@ -358,7 +367,7 @@ export class LgNetcastTV {
       const diff = idx - currentIdx - 1;
       for (let i = 1; i <= diff; i++) {
         await this.sendAuthorizedCommand(LG_COMMAND.RIGHT);
-        await this.wait(this.netcastAccessory.keyInputDelay);
+        await this.wait(this.deviceConfig.keyInputDelay);
       }
       await this.sendAuthorizedCommand(LG_COMMAND.OK);
     }
@@ -373,7 +382,7 @@ export class LgNetcastTV {
     }
 
     try {
-      const sessionId = await this.netcastClient.get_session(this.netcastAccessory.accessToken);
+      const sessionId = await this.netcastClient.get_session(this.deviceConfig.accessToken);
       this.currentChannel = await this.netcastClient.get_current_channel(sessionId);
     } catch (e) {
       this.currentChannel = null;
@@ -390,7 +399,7 @@ export class LgNetcastTV {
 
     // check all existing channels and see if the current channel matches with either of them
     // if it does, update the active input source to that
-    for (const [i, chan] of this.netcastAccessory.channels.entries()) {
+    for (const [i, chan] of this.deviceConfig.channels.entries()) {
       if (
         (chan.type === 'hdmi' && chan.channel.inputSourceIdx === this.currentChannel.inputSourceIdx) ||
         (chan.type === 'tuner' &&
