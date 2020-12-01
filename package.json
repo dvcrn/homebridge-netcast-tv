@@ -3,7 +3,7 @@
   "name": "homebridge-netcast-tv",
   "version": "2.0.2",
   "description": "Homebridge plugin to interact with LG Netcast TVs",
-  "license": "MIT",
+  "license": "LICENSE NOT DECIDED YET",
   "repository": {
     "type": "git",
     "url": "https://github.com/dvcrn/homebridge-netcast-tv"
